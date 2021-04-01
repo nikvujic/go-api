@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
+	"sync"
 )
 
 type Book struct {
@@ -13,6 +15,7 @@ type Book struct {
 }
 
 type bookHandlers struct {
+	sync.Mutex
 	store map[string]Book
 }
 
@@ -34,11 +37,13 @@ func (h *bookHandlers) books(w http.ResponseWriter, r *http.Request) {
 func (h *bookHandlers) get(w http.ResponseWriter, r *http.Request) {
 	books := make([]Book, len(h.store))
 
+	h.Lock()
 	i := 0
 	for _, book := range h.store {
 		books[i] = book
 		i++
 	}
+	h.Unlock()
 
 	jsonBytes, err := json.Marshal(books)
 	if err != nil {
@@ -52,7 +57,23 @@ func (h *bookHandlers) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bookHandlers) post(w http.ResponseWriter, r *http.Request) {
-	// 16
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		w.WriteHeader((http.StatusInternalServerError))
+		w.Write([]byte(err.Error()))
+	}
+
+	var book Book
+	err = json.Unmarshal(bodyBytes, &book)
+	if err != nil {
+		w.WriteHeader((http.StatusBadRequest))
+		w.Write([]byte(err.Error()))
+	}
+
+	h.Lock()
+	h.store[book.ID] = book
+	defer h.Unlock()
 
 }
 
