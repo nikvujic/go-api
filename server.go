@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type Book struct {
@@ -62,6 +64,14 @@ func (h *bookHandlers) post(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader((http.StatusInternalServerError))
 		w.Write([]byte(err.Error()))
+		return
+	}
+
+	ct := r.Header.Get("content-type")
+	if ct != "application/json" {
+		w.WriteHeader((http.StatusUnsupportedMediaType))
+		w.Write([]byte(fmt.Sprintf("need content-type 'application/json', but got '%s'", ct)))
+		return
 	}
 
 	var book Book
@@ -69,7 +79,10 @@ func (h *bookHandlers) post(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader((http.StatusBadRequest))
 		w.Write([]byte(err.Error()))
+		return
 	}
+
+	book.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 
 	h.Lock()
 	h.store[book.ID] = book
@@ -79,26 +92,7 @@ func (h *bookHandlers) post(w http.ResponseWriter, r *http.Request) {
 
 func newBookHandlers() *bookHandlers {
 	return &bookHandlers{
-		store: map[string]Book{
-			"1": Book{
-				ID:     "1",
-				Title:  "The Hitchhiker's Guide to the Galaxy",
-				Author: "Daglas Adams",
-				Price:  40,
-			},
-			"2": Book{
-				ID:     "2",
-				Title:  "To Kill a Mockingbird",
-				Author: "Harper Lee",
-				Price:  20,
-			},
-			"3": Book{
-				ID:     "3",
-				Title:  "Don Quixote",
-				Author: "Miguel de Cervantes",
-				Price:  35,
-			},
-		},
+		store: map[string]Book{},
 	}
 }
 
